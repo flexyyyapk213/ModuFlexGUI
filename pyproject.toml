@@ -1,0 +1,7 @@
+[project]
+name = "moduflexgui"
+version = "0.0.1b4"
+
+[tool.flet]
+product = "ModuFlex"
+org = "com.flexyyyapk213"

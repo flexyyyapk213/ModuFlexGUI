@@ -1,2 +1,5 @@
 .venv/
 .history/
+.flet/
+moduflex_datasession.json
+ModuFlex/

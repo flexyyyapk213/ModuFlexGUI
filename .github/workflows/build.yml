@@ -43,7 +43,7 @@ jobs:
           BUILD_NUM="${{ github.run_number }}"
           mkdir -p release_apk
 
-          cp build/apk/*.apk "release_apk/ModuFlexGUI-b${BUILD_NUM}_${BUILD_DATE}-universal.apk"
+          cp build/apk/*.apk "release_apk/ModuFlexGUI-universal-b${BUILD_NUM}_${BUILD_DATE}.apk"
 
       - name: Build Split APKs
         run: flet build apk --yes --split-per-abi
@@ -55,7 +55,7 @@ jobs:
 
           for apk in build/apk/*.apk; do
             filename=$(basename "$apk")
-            cp "$apk" "release_apk/ModuFlexGUI-b${BUILD_NUM}_${BUILD_DATE}-${filename}"
+            cp "$apk" "release_apk/${filename}-b${BUILD_NUM}_${BUILD_DATE}"
           done
 
       - name: Upload APKs to created Release
