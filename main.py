@@ -175,7 +175,7 @@ class ModuFlexGUI:
         self.main_menu.controls[1].value += 'Начало установки ModuFlex...\n'
         await asyncio.sleep(0.1)
 
-        install_git = await asyncio.create_subprocess_exec('choco', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        install_git = await asyncio.create_subprocess_exec('pkg', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
         async for line in install_git.stdout:
             self.main_menu.controls[1].value += line.decode('utf-8', errors='ignore')
