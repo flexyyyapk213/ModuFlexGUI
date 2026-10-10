@@ -18,6 +18,7 @@ import flet as ft
 import json
 from pathlib import Path
 import asyncio
+import os
 
 class SafeView(ft.View):
     def __init__(self, route: str, controls: list[ft.Control], **kwargs):
@@ -47,10 +48,18 @@ class ModuFlexGUI:
         self.api_hash = ft.TextField(label='API Hash')
         self.phone_number = ft.TextField(label='Номер телефона', keyboard_type=ft.KeyboardType.PHONE)
         self.password = ft.TextField(label='Пароль', password=True)
+
+        # FIXME: Убрать этот бордак
         self.main_menu = ft.Column(controls=[
             ft.Button('Установить ModuFlex', on_click=self.install_moduflex),
-            ft.TextField(read_only=True, value='Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', multiline=True, max_lines=20)
-        ])
+            ft.TextField(read_only=True, value='Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', multiline=True, max_lines=20, label='Console')
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        self.inst_moduflex = ft.Column(controls=[
+            ft.Button('Установить ModuFlex', on_click=self.install_moduflex),
+            ft.TextField(read_only=True, value='Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', multiline=True, max_lines=20, label='Console')
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+
+        self.terminal_moduflex = None
 
         self.rooms = {
             "/": self.main_room,
@@ -83,16 +92,20 @@ class ModuFlexGUI:
                 json.dump(self.user_data, f)
         
         if self.user_data['phone_number'] is not None:
-            if Path(__file__).parent.joinpath('ModuFlex').exists():
+            room = self.main_menu
+            if Path(os.getcwd()).joinpath('ModuFlex').exists():
                 self.main_menu.controls.pop(0)
                 self.main_menu.controls.extend([
-                    ft.AppBar(title='Главное меню', center_title=True),
                     ft.Text('ModuFlex установлен.'),
-                    ft.Button('Запустить ModuFlex', on_click=self.start_moduflex)
+                    ft.Row(controls=[ft.Button('Запустить ModuFlex', on_click=self.start_moduflex)], alignment=ft.MainAxisAlignment.CENTER),
+                    ft.Row(controls=[
+                        ft.Button('A', bgcolor="white", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('A'))), ft.Button('Y', bgcolor="green", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('Y'))), ft.Button('N', bgcolor="red", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('N')))
+                    ], alignment=ft.MainAxisAlignment.CENTER)
                 ])
                 self.main_menu.controls.append(self.main_menu.controls.pop(0))
-                self.main_menu.controls[-1].value = 'Добро пожаловать в ModuFlex!'
-                self.page.update()
+                self.main_menu.controls[-1].value = 'Добро пожаловать в ModuFlexGUI!\n'
+            else:
+                room = self.inst_moduflex
             return SafeView(route='/', controls=[
                 ft.AppBar(title='Главное меню', center_title=True),
                 ft.Container(self.main_menu, align=ft.Alignment.CENTER)
@@ -119,7 +132,7 @@ class ModuFlexGUI:
         
         self.user_data['api_id'] = self.api_id.value
         self.user_data['api_hash'] = self.api_hash.value
-        self.user_data['phone_number'] = self.phone_number.value
+        self.user_data['phone_number'] = self.phone_number.value.replace('+', '')
         self.user_data['password'] = self.password.value
 
         self.save_user_data()
@@ -175,10 +188,13 @@ class ModuFlexGUI:
         self.main_menu.controls[1].value += 'Начало установки ModuFlex...\n'
         await asyncio.sleep(0.1)
 
-        install_git = await asyncio.create_subprocess_exec('pkg', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        install_git = await asyncio.create_subprocess_exec('choco', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
-        async for line in install_git.stdout:
-            self.main_menu.controls[1].value += line.decode('utf-8', errors='ignore')
+        while True:
+            chunk = await install_git.stdout.read(1024)
+            if not chunk:
+                break
+            self.main_menu.controls[1].value += chunk.decode('utf-8', errors='ignore')
             self.page.update()
         
         await install_git.wait()
@@ -194,8 +210,11 @@ class ModuFlexGUI:
         
         clone_moduflex = await asyncio.create_subprocess_exec('git', 'clone', 'https://github.com/flexyyyapk213/ModuFlex.git', '-b', 'main', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
-        async for line in clone_moduflex.stdout:
-            self.main_menu.controls[1].value += line.decode('utf-8', errors='ignore')
+        while True:
+            chunk = await clone_moduflex.stdout.read(1024)
+            if not chunk:
+                break
+            self.main_menu.controls[1].value += chunk.decode('utf-8', errors='ignore')
             self.page.update()
         
         await clone_moduflex.wait()
@@ -203,17 +222,81 @@ class ModuFlexGUI:
         if clone_moduflex.returncode != 0:
             self.alert('Ошибка при клонировании ModuFlex.')
         
+        with open('ModuFlex/config.ini', 'w') as f:
+            data = [
+                f'api_id = {self.user_data["api_id"]}\n',
+                f'api_hash = "{self.user_data["api_hash"]}"\n',
+                f'phone_number = {self.user_data["phone_number"]}\n',
+                'send_message = true\n',
+                'one_download_libs = true\n',
+                'use_botvenv = true\n'
+            ]
+
+            if self.user_data['password'] not in ['', None]:
+                data.append(f'password = "{self.user_data["password"]}"')
+
+            f.writelines(data)
+        
         self.main_menu.controls[1].value += 'ModuFlex успешно склонирован.\n'
         await asyncio.sleep(0.1)
 
         self.route_change('/')
     
     async def start_moduflex(self, e: ft.ControlEvent):
-        self.main_menu.controls[2].disabled = True
+        self.main_menu.controls[1].controls[0].disabled = True
+        self.main_menu.controls[1].controls.append(ft.Button('Stop', bgcolor="red", on_click=self.finish_moduflex))
         self.page.update()
-        await asyncio.sleep(2)
-        self.main_menu.controls[2].disabled = False
-        self.page.update()
+
+        try:
+            self.terminal_moduflex = await asyncio.create_subprocess_exec('python', os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+
+            while self.terminal_moduflex.returncode is None:
+                if self.terminal_moduflex.stdout:
+                    while True:
+                        try:
+                            chunk = await asyncio.wait_for(
+                                self.terminal_moduflex.stdout.read(1024), 
+                                timeout=0.5
+                            )
+                        except asyncio.TimeoutError:
+                            if self.terminal_moduflex.returncode is not None:
+                                break
+                            continue
+
+                        if not chunk:
+                            break
+                        self.main_menu.controls[3].value += chunk.decode('utf-8', errors='ignore')
+                        self.page.update()
+                
+                await asyncio.sleep(1)
+        except Exception as _e:
+            self.alert(str(e))
+        finally:
+            await self.terminal_moduflex.wait()
+
+            self.terminal_moduflex = None
+        
+            self.main_menu.controls[1].controls[0].disabled = False
+            self.main_menu.controls[1].controls.pop(1)
+            self.page.update()
+    
+    async def finish_moduflex(self, e: ft.ControlEvent):
+        print('kill')
+        try:
+            self.terminal_moduflex.terminate()
+
+            await self.terminal_moduflex.wait()
+        except ProcessLookupError:
+            pass
+        except Exception as _e:
+            self.alert(str(_e))
+    
+    async def write_to_stdin(self, text: str):
+        if self.terminal_moduflex is None:
+            return
+
+        self.terminal_moduflex.stdin.write(text.encode('utf-8'))
+        await self.terminal_moduflex.stdin.drain()
 
 if __name__ == "__main__":
     ft.run(ModuFlexGUI, view=ft.AppView.WEB_BROWSER)
