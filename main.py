@@ -46,6 +46,7 @@ class ModuFlexGUI:
 
         self.page.on_view_pop = self.view_pop
         self.page.on_route_change = self.route_change
+        self.page.window.on_event = self.window_event
 
         self.api_id = ft.TextField(label='API ID', keyboard_type=ft.KeyboardType.NUMBER)
         self.api_hash = ft.TextField(label='API Hash')
@@ -59,7 +60,7 @@ class ModuFlexGUI:
                 ft.Button('A', bgcolor="white", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('A'))), ft.Button('Y', bgcolor="green", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('Y'))), ft.Button('N', bgcolor="red", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('N')))
             ], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(content=ft.ListView(auto_scroll=True, spacing=2, padding=5), bgcolor="#252a30", align=ft.Alignment.CENTER, width=600, height=300),
-            ft.Row(controls=[ft.TextField(label='stdin', border_radius=ft.BorderRadius.only(top_left=15, bottom_left=15), border_color='#666666'), ft.Button('send', bgcolor='#5d97f5', style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=ft.BorderRadius.only(top_right=15, bottom_right=15)), padding=ft.Padding(top=21.8, bottom=21.8)), on_click=self.wrs_field)], alignment=ft.MainAxisAlignment.CENTER, spacing=0)
+            ft.Row(controls=[ft.TextField(label='stdin', border=ft.OutlineInputBorder(side=ft.BorderSide(color='#666666'), border_radius=ft.BorderRadius.only(top_left=15, bottom_left=15))), ft.Button('send', bgcolor='#5d97f5', style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=ft.BorderRadius.only(top_right=15, bottom_right=15)), padding=ft.Padding(top=21.8, bottom=21.8)), on_click=self.wrs_field)], alignment=ft.MainAxisAlignment.CENTER, spacing=0)
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
         
         self.inst_moduflex = ft.Column(controls=[
@@ -234,8 +235,9 @@ class ModuFlexGUI:
         self.route_change('/')
     
     async def start_moduflex(self, e: ft.ControlEvent):
-        if not await self.notification.request_permissions():
-            return
+        if sys.platform in ['android', 'linux']:
+            if not await self.notification.request_permissions():
+                return
 
         self.page.run_task(self.work_moduflex)
 
@@ -245,46 +247,21 @@ class ModuFlexGUI:
         self.page.update()
 
         try:
-            await self.notification.start_foreground_service(
-                1,
-                '🟢Старт ModuFlex',
-                'Вы запустили ModuFlex' + random.choice(['😎', '🎉', '⭐', '❤', '✨']),
-                foreground_service_types=['special_use'],
-                ongoing=True,
-                start_type='start_sticky'
-            )
+            if sys.platform in ['android', 'linux']:
+                await self.notification.start_foreground_service(
+                    1,
+                    '🟢Старт ModuFlex',
+                    'Вы запустили ModuFlex' + random.choice(['😎', '🎉', '⭐', '❤', '✨']),
+                    foreground_service_types=['special_use'],
+                    ongoing=True,
+                    start_type='start_sticky'
+                )
 
             self.terminal_moduflex = await asyncio.create_subprocess_exec('python', os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
             while self.terminal_moduflex.returncode is None:
                 if self.terminal_moduflex.stdout:
-                    buffer = ''
-                    while True:
-                        try:
-                            chunk = await asyncio.wait_for(
-                                self.terminal_moduflex.stdout.read(1024), 
-                                timeout=0.5
-                            )
-                        except asyncio.TimeoutError:
-                            if self.terminal_moduflex.returncode is not None:
-                                self.main_menu.controls[3].content.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
-                                break
-                            continue
-
-                        if not chunk:
-                            self.main_menu.controls[3].content.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
-                            break
-                        
-                        buffer += chunk.decode('utf-8', errors='ignore')
-
-                        lines = buffer.split('\n')
-
-                        buffer = lines.pop()
-
-                        for line in lines:
-                            self.main_menu.controls[3].content.controls.append(ft.Text(line, font_family="Consolas", size=13, color="#00ff00"))
-
-                        self.page.update()
+                    await self.read_and_display_cons(self.terminal_moduflex, self.main_menu.controls[3].content)
                 
                 await asyncio.sleep(1)
         except Exception as _e:
@@ -330,11 +307,11 @@ class ModuFlexGUI:
                 )
             except asyncio.TimeoutError:
                 if proc.returncode is not None:
-                    if buffer: list_v.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
+                    if buffer: list_v.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
                     break
                 continue
             if not chunk:
-                if buffer: list_v.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
+                if buffer: list_v.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
                 break
 
             buffer += chunk.decode('utf-8', errors='ignore')
@@ -345,13 +322,13 @@ class ModuFlexGUI:
 
             for line in lines:
                 if listv_bf is not None:
-                    listv_bf.value += line + '\n'
+                    list_v.controls[listv_bf - 1].value += line + '\n'
                     listv_bf = None
-                list_v.append(ft.Text(line, font_family="Consolas", size=13, color="#00ff00"))
-            else:
-                if buffer:
-                    listv_bf = ft.Text(buffer)
-                    list_v.append(listv_bf)
+                list_v.controls.append(ft.Text(line, font_family="Consolas", size=13, color="#00ff00"))
+            
+            if buffer:
+                list_v.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
+                listv_bf = len(list_v.controls)
             
             self.page.update()
     
@@ -364,11 +341,10 @@ class ModuFlexGUI:
         self.page.update()
     
     async def window_event(self, e):
-        print(e.data)
-        if e.data == "close":
+        print(e)
+        if e.type == ft.WindowEventType.CLOSE:
             if self.terminal_moduflex is not None:
                 self.terminal_moduflex.terminate()
-                await self.wakelock.disable()
                 await self.page.window.destroy()
                 sys.exit(0)
 
