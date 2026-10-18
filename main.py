@@ -190,7 +190,7 @@ class ModuFlexGUI:
         self.inst_moduflex.controls[1].content.controls.append(ft.Text('Начало установки ModuFlex...', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
 
-        install_git = await asyncio.create_subprocess_exec('choco', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        install_git = await asyncio.create_subprocess_exec('pkg', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
         await self.read_and_display_cons(install_git, self.inst_moduflex.controls[1].content.controls)
         
