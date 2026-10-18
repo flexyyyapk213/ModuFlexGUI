@@ -51,7 +51,6 @@ class ModuFlexGUI:
         self.api_hash = ft.TextField(label='API Hash')
         self.phone_number = ft.TextField(label='Номер телефона', keyboard_type=ft.KeyboardType.PHONE)
         self.password = ft.TextField(label='Пароль', password=True)
-        self.wakelock = None
 
         self.main_menu = ft.Column(controls=[
             ft.Text('ModuFlex установлен.'),
@@ -245,12 +244,6 @@ class ModuFlexGUI:
         self.main_menu.controls[1].controls.append(ft.Button('Stop', bgcolor="red", on_click=self.finish_moduflex))
         self.page.update()
 
-        # self.wakelock = ft.Wakelock()
-        # self.page.overlay.append(self.wakelock)
-        # self.page.update()
-
-        # await self.wakelock.enable()
-
         try:
             await self.notification.start_foreground_service(
                 1,
@@ -300,11 +293,6 @@ class ModuFlexGUI:
             await self.terminal_moduflex.wait()
 
             self.terminal_moduflex = None
-            
-            # try:
-            #     await self.wakelock.disable()
-            # except:
-            #     pass
         
             self.main_menu.controls[1].controls[0].disabled = False
             self.main_menu.controls[1].controls.pop(1)
