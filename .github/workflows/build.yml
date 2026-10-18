@@ -34,8 +34,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate Project Template
-        run: flet create .
+      - name: Generate Android project files (First pass)
+        run: flet build apk -v --yes || true
 
       - name: Enable Core Library Desugaring
         run: |
@@ -44,15 +44,17 @@ jobs:
           with open(path, "r") as f:
               content = f.read()
           
+          # Включаем desugaring в compileOptions
           content = content.replace("compileOptions {", "compileOptions {\n        coreLibraryDesugaringEnabled true")
           
+          # Добавляем зависимость в конец файла
           content += "\ndependencies {\n    coreLibraryDesugaring \"com.android.tools:desugar_jdk_libs:2.0.4\"\n}\n"
           
           with open(path, "w") as f:
               f.write(content)
           '
 
-      - name: Build APK
+      - name: Build APK (Final pass)
         run: flet build apk -v --yes
 
       - name: Creating an intermediate Flutter project
