@@ -35,7 +35,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Creating an intermediate Flutter project
-        run: flet build apk -v --yes --force
+        run: flet build apk -v --yes
 
       - name: Patch the manifest
         run: |
