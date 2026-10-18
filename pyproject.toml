@@ -1,7 +1,17 @@
 [project]
 name = "moduflexgui"
 version = "0.0.1b4"
+dependencies = [
+    "flet>=0.82.0",
+    "flet-android-notifications"
+]
 
 [tool.flet]
 product = "ModuFlex"
 org = "com.flexyyyapk213"
+
+[tool.flet.android.permission]
+"android.permission.POST_NOTIFICATIONS" = true
+"android.permission.FOREGROUND_SERVICE" = true
+"android.permission.FOREGROUND_SERVICE_SPECIAL_USE" = true
+"android.permission.IGNORE_BATTERY_OPTIMIZATIONS" = true

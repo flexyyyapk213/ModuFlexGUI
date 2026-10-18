@@ -14,11 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from flet_android_notifications import FletAndroidNotifications
 import flet as ft
 import json
 from pathlib import Path
 import asyncio
 import os
+import sys
+import random
 
 class SafeView(ft.View):
     def __init__(self, route: str, controls: list[ft.Control], **kwargs):
@@ -48,18 +51,28 @@ class ModuFlexGUI:
         self.api_hash = ft.TextField(label='API Hash')
         self.phone_number = ft.TextField(label='Номер телефона', keyboard_type=ft.KeyboardType.PHONE)
         self.password = ft.TextField(label='Пароль', password=True)
+        self.wakelock = None
 
-        # FIXME: Убрать этот бордак
         self.main_menu = ft.Column(controls=[
-            ft.Button('Установить ModuFlex', on_click=self.install_moduflex),
-            ft.TextField(read_only=True, value='Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', multiline=True, max_lines=20, label='Console')
+            ft.Text('ModuFlex установлен.'),
+            ft.Row(controls=[ft.Button('Запустить ModuFlex', on_click=self.start_moduflex)], alignment=ft.MainAxisAlignment.CENTER),
+            ft.Row(controls=[
+                ft.Button('A', bgcolor="white", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('A'))), ft.Button('Y', bgcolor="green", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('Y'))), ft.Button('N', bgcolor="red", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('N')))
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            ft.Container(content=ft.ListView(auto_scroll=True, spacing=2, padding=5), bgcolor="#252a30", align=ft.Alignment.CENTER, width=600, height=300),
+            ft.Row(controls=[ft.TextField(label='stdin', border_radius=ft.BorderRadius.only(top_left=15, bottom_left=15), border_color='#666666'), ft.Button('send', bgcolor='#5d97f5', style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=ft.BorderRadius.only(top_right=15, bottom_right=15)), padding=ft.Padding(top=21.8, bottom=21.8)), on_click=self.wrs_field)], alignment=ft.MainAxisAlignment.CENTER, spacing=0)
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        
         self.inst_moduflex = ft.Column(controls=[
             ft.Button('Установить ModuFlex', on_click=self.install_moduflex),
-            ft.TextField(read_only=True, value='Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', multiline=True, max_lines=20, label='Console')
+            ft.Container(content=ft.ListView(auto_scroll=True, spacing=2, padding=5), bgcolor="#252a30", align=ft.Alignment.CENTER, width=600, height=300)
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
+        self.main_menu.controls[3].content.controls.append(ft.Text('Добро пожаловать в ModuFlex!', font_family="Consolas", size=13, color="#00ff00"))
+        self.inst_moduflex.controls[1].content.controls.append(ft.Text('Нажмите на кнопку "Установить ModuFlex" для установки ModuFlex на ваше устройство.', font_family="Consolas", size=13, color="#00ff00"))
+
         self.terminal_moduflex = None
+        self.notification = FletAndroidNotifications()
 
         self.rooms = {
             "/": self.main_room,
@@ -93,22 +106,11 @@ class ModuFlexGUI:
         
         if self.user_data['phone_number'] is not None:
             room = self.main_menu
-            if Path(os.getcwd()).joinpath('ModuFlex').exists():
-                self.main_menu.controls.pop(0)
-                self.main_menu.controls.extend([
-                    ft.Text('ModuFlex установлен.'),
-                    ft.Row(controls=[ft.Button('Запустить ModuFlex', on_click=self.start_moduflex)], alignment=ft.MainAxisAlignment.CENTER),
-                    ft.Row(controls=[
-                        ft.Button('A', bgcolor="white", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('A'))), ft.Button('Y', bgcolor="green", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('Y'))), ft.Button('N', bgcolor="red", color="black", on_click=lambda e: asyncio.create_task(self.write_to_stdin('N')))
-                    ], alignment=ft.MainAxisAlignment.CENTER)
-                ])
-                self.main_menu.controls.append(self.main_menu.controls.pop(0))
-                self.main_menu.controls[-1].value = 'Добро пожаловать в ModuFlexGUI!\n'
-            else:
+            if not Path(os.getcwd()).joinpath('ModuFlex').exists():
                 room = self.inst_moduflex
             return SafeView(route='/', controls=[
                 ft.AppBar(title='Главное меню', center_title=True),
-                ft.Container(self.main_menu, align=ft.Alignment.CENTER)
+                ft.Container(room, align=ft.Alignment.CENTER)
             ])
         else:
             return self.registration_room()
@@ -182,40 +184,30 @@ class ModuFlexGUI:
             json.dump(self.user_data, f)
     
     async def install_moduflex(self, e: ft.ControlEvent):
-        self.main_menu.controls[0].disabled = True
+        self.inst_moduflex.controls[0].disabled = True
         self.page.update()
 
-        self.main_menu.controls[1].value += 'Начало установки ModuFlex...\n'
+        self.inst_moduflex.controls[1].content.controls.append(ft.Text('Начало установки ModuFlex...', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
 
-        install_git = await asyncio.create_subprocess_exec('pkg', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        install_git = await asyncio.create_subprocess_exec('choco', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
-        while True:
-            chunk = await install_git.stdout.read(1024)
-            if not chunk:
-                break
-            self.main_menu.controls[1].value += chunk.decode('utf-8', errors='ignore')
-            self.page.update()
+        await self.read_and_display_cons(install_git, self.inst_moduflex.controls[1].content.controls)
         
         await install_git.wait()
         
         if install_git.returncode != 0:
             self.alert('Ошибка при установке git.')
         
-        self.main_menu.controls[1].value += 'Git успешно установлен.\n'
+        self.inst_moduflex.controls[1].content.controls.append(ft.Text('Git успешно установлен.', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
 
-        self.main_menu.controls[1].value += 'Клонирование ModuFlex...\n'
+        self.inst_moduflex.controls[1].content.controls.append(ft.Text('Клонирование ModuFlex...', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
         
         clone_moduflex = await asyncio.create_subprocess_exec('git', 'clone', 'https://github.com/flexyyyapk213/ModuFlex.git', '-b', 'main', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
-        while True:
-            chunk = await clone_moduflex.stdout.read(1024)
-            if not chunk:
-                break
-            self.main_menu.controls[1].value += chunk.decode('utf-8', errors='ignore')
-            self.page.update()
+        await self.read_and_display_cons(clone_moduflex, self.inst_moduflex.controls[1].content.controls)
         
         await clone_moduflex.wait()
         
@@ -237,21 +229,43 @@ class ModuFlexGUI:
 
             f.writelines(data)
         
-        self.main_menu.controls[1].value += 'ModuFlex успешно склонирован.\n'
+        self.inst_moduflex.controls[1].content.controls.append(ft.Text('ModuFlex успешно склонирован.', font_family="Consolas", size=13, color="#377ded"))
         await asyncio.sleep(0.1)
 
         self.route_change('/')
     
     async def start_moduflex(self, e: ft.ControlEvent):
+        if not await self.notification.request_permissions():
+            return
+
+        self.page.run_task(self.work_moduflex)
+
+    async def work_moduflex(self):
         self.main_menu.controls[1].controls[0].disabled = True
         self.main_menu.controls[1].controls.append(ft.Button('Stop', bgcolor="red", on_click=self.finish_moduflex))
         self.page.update()
 
+        # self.wakelock = ft.Wakelock()
+        # self.page.overlay.append(self.wakelock)
+        # self.page.update()
+
+        # await self.wakelock.enable()
+
         try:
+            await self.notification.start_foreground_service(
+                1,
+                '🟢Старт ModuFlex',
+                'Вы запустили ModuFlex' + random.choice(['😎', '🎉', '⭐', '❤', '✨']),
+                foreground_service_types=['special_use'],
+                ongoing=True,
+                start_type='start_sticky'
+            )
+
             self.terminal_moduflex = await asyncio.create_subprocess_exec('python', os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
             while self.terminal_moduflex.returncode is None:
                 if self.terminal_moduflex.stdout:
+                    buffer = ''
                     while True:
                         try:
                             chunk = await asyncio.wait_for(
@@ -260,24 +274,41 @@ class ModuFlexGUI:
                             )
                         except asyncio.TimeoutError:
                             if self.terminal_moduflex.returncode is not None:
+                                self.main_menu.controls[3].content.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
                                 break
                             continue
 
                         if not chunk:
+                            self.main_menu.controls[3].content.controls.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
                             break
-                        self.main_menu.controls[3].value += chunk.decode('utf-8', errors='ignore')
+                        
+                        buffer += chunk.decode('utf-8', errors='ignore')
+
+                        lines = buffer.split('\n')
+
+                        buffer = lines.pop()
+
+                        for line in lines:
+                            self.main_menu.controls[3].content.controls.append(ft.Text(line, font_family="Consolas", size=13, color="#00ff00"))
+
                         self.page.update()
                 
                 await asyncio.sleep(1)
         except Exception as _e:
-            self.alert(str(e))
+            self.alert(str(_e))
         finally:
             await self.terminal_moduflex.wait()
 
             self.terminal_moduflex = None
+            
+            # try:
+            #     await self.wakelock.disable()
+            # except:
+            #     pass
         
             self.main_menu.controls[1].controls[0].disabled = False
             self.main_menu.controls[1].controls.pop(1)
+            self.main_menu.controls[3].content.controls.clear()
             self.page.update()
     
     async def finish_moduflex(self, e: ft.ControlEvent):
@@ -295,8 +326,63 @@ class ModuFlexGUI:
         if self.terminal_moduflex is None:
             return
 
+        text = text + '\n'
+
         self.terminal_moduflex.stdin.write(text.encode('utf-8'))
         await self.terminal_moduflex.stdin.drain()
+    
+    async def read_and_display_cons(self, proc: asyncio.subprocess.Process, list_v: ft.ListView):
+        buffer = ''
+        listv_bf: ft.Text = None
+        while True:
+            try:
+                chunk = await asyncio.wait_for(
+                    proc.stdout.read(1024), 
+                    timeout=0.5
+                )
+            except asyncio.TimeoutError:
+                if proc.returncode is not None:
+                    if buffer: list_v.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
+                    break
+                continue
+            if not chunk:
+                if buffer: list_v.append(ft.Text(buffer, font_family="Consolas", size=13, color="#00ff00"))
+                break
+
+            buffer += chunk.decode('utf-8', errors='ignore')
+
+            lines = buffer.split('\n')
+
+            buffer = lines.pop()
+
+            for line in lines:
+                if listv_bf is not None:
+                    listv_bf.value += line + '\n'
+                    listv_bf = None
+                list_v.append(ft.Text(line, font_family="Consolas", size=13, color="#00ff00"))
+            else:
+                if buffer:
+                    listv_bf = ft.Text(buffer)
+                    list_v.append(listv_bf)
+            
+            self.page.update()
+    
+    async def wrs_field(self, e):
+        if self.main_menu.controls[4].controls[0].value != '': await self.write_to_stdin(self.main_menu.controls[4].controls[0].value)
+        else:
+            self.alert('Введите текст!')
+        
+        self.main_menu.controls[4].controls[0].value = ''
+        self.page.update()
+    
+    async def window_event(self, e):
+        print(e.data)
+        if e.data == "close":
+            if self.terminal_moduflex is not None:
+                self.terminal_moduflex.terminate()
+                await self.wakelock.disable()
+                await self.page.window.destroy()
+                sys.exit(0)
 
 if __name__ == "__main__":
-    ft.run(ModuFlexGUI, view=ft.AppView.WEB_BROWSER)
+    ft.run(ModuFlexGUI, view=ft.AppView.FLET_APP)
