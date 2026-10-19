@@ -1,5 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
 .venv/
-.history/
+venv/
+env/
+
+# Environments / secrets
+.env
+
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Flet
 .flet/
-moduflex_datasession.json
-ModuFlex/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+.history/
