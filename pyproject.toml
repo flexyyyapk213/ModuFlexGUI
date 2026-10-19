@@ -40,3 +40,9 @@ copyright = "Copyright (C) 2026 by ModuFlexGUI"
 
 [tool.flet.app]
 path = "src"
+
+[tool.flet.android.permission]
+"android.permission.POST_NOTIFICATIONS" = true
+"android.permission.FOREGROUND_SERVICE" = true
+"android.permission.FOREGROUND_SERVICE_SPECIAL_USE" = true
+"android.permission.IGNORE_BATTERY_OPTIMIZATIONS" = true
