@@ -22,6 +22,7 @@ import asyncio
 import os
 import sys
 import random
+from dulwich import porcelain
 
 class SafeView(ft.View):
     def __init__(self, route: str, controls: list[ft.Control], **kwargs):
@@ -190,29 +191,15 @@ class ModuFlexGUI:
         self.inst_moduflex.controls[1].content.controls.append(ft.Text('Начало установки ModuFlex...', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
 
-        install_git = await asyncio.create_subprocess_exec('pkg', 'install', 'git', '-y', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-
-        await self.read_and_display_cons(install_git, self.inst_moduflex.controls[1].content.controls)
-        
-        await install_git.wait()
-        
-        if install_git.returncode != 0:
-            self.alert('Ошибка при установке git.')
-        
-        self.inst_moduflex.controls[1].content.controls.append(ft.Text('Git успешно установлен.', font_family="Consolas", size=13, color="#00ff00"))
-        await asyncio.sleep(0.1)
-
         self.inst_moduflex.controls[1].content.controls.append(ft.Text('Клонирование ModuFlex...', font_family="Consolas", size=13, color="#00ff00"))
         await asyncio.sleep(0.1)
-        
-        clone_moduflex = await asyncio.create_subprocess_exec('git', 'clone', 'https://github.com/flexyyyapk213/ModuFlex.git', '-b', 'main', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
-        await self.read_and_display_cons(clone_moduflex, self.inst_moduflex.controls[1].content.controls)
-        
-        await clone_moduflex.wait()
-        
-        if clone_moduflex.returncode != 0:
-            self.alert('Ошибка при клонировании ModuFlex.')
+        try:
+            await asyncio.to_thread(porcelain.clone, 'https://github.com/flexyyyapk213/ModuFlex.git')
+        except Exception as e:
+            self.inst_moduflex.controls[0].disabled = False
+            self.page.update()
+            return self.alert('Ошибка при клонировании: ' + str(e))
         
         with open('ModuFlex/config.ini', 'w') as f:
             data = [
@@ -341,7 +328,6 @@ class ModuFlexGUI:
         self.page.update()
     
     async def window_event(self, e):
-        print(e)
         if e.type == ft.WindowEventType.CLOSE:
             if self.terminal_moduflex is not None:
                 self.terminal_moduflex.terminate()
