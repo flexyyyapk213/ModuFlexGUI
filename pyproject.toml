@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "flet>=1.0.1",
-    "flet_android_notifications"
+    "flet_android_notifications",
+    "dulwich"
 ]
 
 [dependency-groups]
@@ -17,7 +18,8 @@ dev = [
     # Integration testing with `flet test` / pytest. The `test` extra brings in
     # pytest, pytest-asyncio and the screenshot-comparison dependencies.
     "flet[test]>=1.0.1",
-    "flet-android-notifications"
+    "flet-android-notifications",
+    "dulwich"
 ]
 
 [tool.pytest.ini_options]
