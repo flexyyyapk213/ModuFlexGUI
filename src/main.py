@@ -244,7 +244,7 @@ class ModuFlexGUI:
                     start_type='start_sticky'
                 )
 
-            self.terminal_moduflex = await asyncio.create_subprocess_exec('python', os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+            self.terminal_moduflex = await asyncio.create_subprocess_exec(sys.executable, os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
             while self.terminal_moduflex.returncode is None:
                 if self.terminal_moduflex.stdout:
