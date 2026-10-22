@@ -1,6 +1,6 @@
 [project]
 name = "ModuFlexGUI"
-version = "0.0.1b6"
+version = "0.0.1b7"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"

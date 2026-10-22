@@ -195,7 +195,7 @@ class ModuFlexGUI:
         await asyncio.sleep(0.1)
 
         try:
-            await asyncio.to_thread(porcelain.clone, 'https://github.com/flexyyyapk213/ModuFlex.git')
+            await asyncio.to_thread(porcelain.clone, 'https://github.com/flexyyyapk213/ModuFlex.git', 'ModuFlex')
         except Exception as e:
             self.inst_moduflex.controls[0].disabled = False
             self.page.update()
