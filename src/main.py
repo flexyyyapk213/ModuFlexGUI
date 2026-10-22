@@ -233,6 +233,17 @@ class ModuFlexGUI:
         self.main_menu.controls[1].controls.append(ft.Button('Stop', bgcolor="red", on_click=self.finish_moduflex))
         self.page.update()
 
+        if not Path('ModuFlex/botvenv').exists():
+            try:
+                await (await asyncio.create_subprocess_exec(sys.executable, '-m', 'venv', os.path.abspath('ModuFlex/botvenv'))).wait()
+            except Exception as e:
+                return self.alert(str(e))
+        
+        if sys.platform == 'win32':
+            botvenv_path = os.path.abspath('ModuFlex/botvenv/Scripts/python.exe')
+        else:
+            botvenv_path = os.path.abspath('ModuFlex/botvenv/bin/python')
+
         try:
             if sys.platform in ['android', 'linux']:
                 await self.notification.start_foreground_service(
@@ -244,7 +255,7 @@ class ModuFlexGUI:
                     start_type='start_sticky'
                 )
 
-            self.terminal_moduflex = await asyncio.create_subprocess_exec(sys.executable, os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+            self.terminal_moduflex = await asyncio.create_subprocess_exec(botvenv_path, os.path.abspath('ModuFlex/run.py'), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
 
             while self.terminal_moduflex.returncode is None:
                 if self.terminal_moduflex.stdout:
